@@ -244,6 +244,25 @@ describe('surfaceOp variants', () => {
     }
   })
 
+  test('replacements inherit the first removed seat across shadow, range and successive rewrites', () => {
+    const shadow = driveTimeline([
+      userMessage(1, text('aaaa')),
+      userMessage(2, text('bbbb')),
+      compaction(3, 'summary', { shadowedTokenCount: 8, shadowedSeqs: [2] }),
+      userMessage(4, text('cccc'), undefined, { surfaceOp: { op: 'replace', startSeq: 2, endSeq: 2 } }),
+      userMessage(5, text('dddd'), undefined, { surfaceOp: { op: 'replace', startSeq: 4, endSeq: 4 } }),
+    ]).state
+    assert.deepEqual(shadow.surface.map(n => [n.seq, n.seat]), [[1, undefined], [5, 2]])
+    const range = driveTimeline([
+      userMessage(1, text('aaaa')),
+      userMessage(2, text('bbbb')),
+      userMessage(3, text('cccc')),
+      userMessage(4, text('dddd'), undefined, { surfaceOp: { op: 'replace', startSeq: 2, endSeq: 3 } }),
+      userMessage(5, text('eeee'), undefined, { surfaceOp: { op: 'replace', startSeq: 4, endSeq: 4 } }),
+    ]).state
+    assert.deepEqual(range.surface.map(n => [n.seq, n.seat]), [[1, undefined], [5, 2]])
+  })
+
   test('an armed claim whose seqs are absent from the surface appends the replacement', () => {
     const def = fullDef({})
     const base = driveTimeline([userMessage(1, text('aaaa'))]).state

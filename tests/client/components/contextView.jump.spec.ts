@@ -394,6 +394,38 @@ describe('ContextView — the events card\'s boundary rows', () => {
     await m.unmount()
   })
 
+  test('a reconstructible compaction opens message changes and closing preserves the request landing', async () => {
+    const data = richTimeline({
+      droppedNodes: 0,
+      archive: [{ seq: 1, cat: 'user', tokens: 10, text: 'old hello', gone: 4 }],
+    })
+    const View = makeView(new TestClientCtx())
+    const m = await mount(h(View, { sessionId: 'sv-compactdiff', useProjection: projectionsFor(data) }))
+    await click(compactionLink(m.container))
+    assert.ok(text(m.container).includes(DICT_EN['browser.diff.title']))
+    assert.ok(query(m.container, '.lc-bar[data-seq="4"]').className.includes('lc-bar-selected'))
+    await click(query(m.container, '.lc-br-diff-close'))
+    assert.equal(query<HTMLSelectElement>(m.container, 'select.lc-br-pick').value, '4')
+    await m.unmount()
+  })
+
+  test('a compaction without a request landing still opens a retained replacement diff', async () => {
+    const data = richTimeline({
+      events: [{ seq: 99, time: T0 + 9000, kind: 'compaction', count: 1, tokens: 100 }],
+      nodes: [{ seq: 100, cat: 'assistant', tokens: 10, text: 'summary' }],
+      archive: [{ seq: 1, cat: 'user', tokens: 10, text: 'old hello', gone: 100 }],
+      droppedNodes: 0,
+    })
+    const View = makeView(new TestClientCtx())
+    const m = await mount(h(View, { sessionId: 'sv-compactdiffonly', useProjection: projectionsFor(data) }))
+    const row = queryAll(m.container, '.lc-event').find(item => text(item).includes(DICT_EN['ev.compaction'].replace('{n}', '1')))
+    assert.ok(row !== undefined)
+    await click(query(row, '.lc-event-jump'))
+    assert.ok(text(m.container).includes(DICT_EN['browser.diff.title']))
+    assert.ok(text(m.container).includes(DICT_EN['browser.diff.removed']))
+    await m.unmount()
+  })
+
   test('a compaction past the retained log has no landing step, so its row stays a plain label', async () => {
     const data = richTimeline({ events: [{ seq: 99, time: T0 + 9000, kind: 'compaction', count: 2, tokens: 100 }] })
     const View = makeView(new TestClientCtx())
