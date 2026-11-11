@@ -143,7 +143,7 @@ describe('head-only retention (issue #217)', () => {
   test('a derived state keeps the optional node and request fields and skips junk commands', () => {
     const legacy = {
       surface: [
-        { seq: 1, cat: 'assistant', tokens: 10, reasoning: 4, answerTokens: 5, callTokens: 1, imgs: 2, tool: 'bash' },
+        { seq: 1, seat: 0, cat: 'assistant', tokens: 10, reasoning: 4, answerTokens: 5, callTokens: 1, imgs: 2, tool: 'bash' },
         { seq: 2, cat: 'user', tokens: 3 },
       ],
       requests: [
@@ -171,7 +171,7 @@ describe('head-only retention (issue #217)', () => {
     assert.equal(derived.pendingCodeCmds?.rc3, undefined, 'a root of only junk drops')
     const emptyPending = deriveHeadState({ ...legacy, pendingCodeCmds: { only: ['junk'] } })
     assert.equal(emptyPending?.pendingCodeCmds, undefined, 'all-junk pending maps stay absent')
-    assert.deepEqual(derived.surface[0], { seq: 1, cat: 'assistant', tokens: 10, reasoning: 4, answerTokens: 5, callTokens: 1, imgs: 2, tool: 'bash' })
+    assert.deepEqual(derived.surface[0], { seq: 1, seat: 0, cat: 'assistant', tokens: 10, reasoning: 4, answerTokens: 5, callTokens: 1, imgs: 2, tool: 'bash' })
     assert.deepEqual(derived.surface[1], { seq: 2, cat: 'user', tokens: 3 })
     assert.deepEqual(derived.requests[0], { time: 1, seq: 1, total: 10, turn: 1, step: 0, prompt: 8, activeMs: 20 })
     assert.deepEqual(derived.requests[1], { time: 2, seq: 2, total: 12 })
