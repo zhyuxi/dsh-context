@@ -32,7 +32,7 @@ import {
   tallyRun,
 } from './foldCommands'
 import { TALLY_NAME_CHARS_MAX, TALLY_NAMES_MAX, countCompaction, countInject, countStep, countTurnRuns, noteCommandCall, noteSkillName, noteTurn, trimState } from './foldState'
-import { slimSurfaceNode } from './foldState'
+import { replacementSurfaceNode, surfaceNodeOf } from './foldState'
 import type { CommandStateRecord, TimelineEvent, TimelineState } from './foldState'
 import { accumulateCost, addDecodeSpan, bumpToolTotals, carveWindows, durOf, ensureTiming, idleGapWindows, mergeWindows, tokenCountOf } from './foldMetering'
 import type { UsageLike } from './foldMetering'
@@ -132,10 +132,6 @@ function applyLiveSubsets(st: TimelineState, node: SurfaceNode, sign: 1 | -1): v
   if (node.reasoning !== undefined) st.assistantReasoning += sign * node.reasoning
   if (node.answerTokens !== undefined) st.assistantAnswerTokens += sign * node.answerTokens
   if (node.callTokens !== undefined) st.assistantCallTokens += sign * node.callTokens
-}
-
-function surfaceNodeOf(node: SurfaceNode, bounds: FoldBounds): SurfaceNode {
-  return bounds.headOnly === true ? slimSurfaceNode(node) : node
 }
 
 interface SurfaceRemoval {
@@ -277,7 +273,7 @@ function applySurface(
       const { removed, insertAt } = removeSurfaceSeqs(st, new Set(shadowedSeqs), ev.seq, bounds)
       st.sums[cat] += node.tokens
       applyLiveSubsets(st, node, 1)
-      st.surface.splice(insertAt, 0, surfaceNodeOf(node, bounds))
+      st.surface.splice(insertAt, 0, replacementSurfaceNode(node, removed, bounds))
       if (shadowEventSeq !== undefined) {
         const removedSum = removed.reduce((sum, n) => sum + n.tokens, 0)
         const i = st.events.findIndex(e => e.seq === shadowEventSeq)
@@ -292,7 +288,8 @@ function applySurface(
       if (st.surface[i].seq === op.end) { ei = i; break }
     }
     if (si >= 0 && ei >= si) {
-      const removed = st.surface.splice(si, ei - si + 1, surfaceNodeOf(node, bounds))
+      const replacement = replacementSurfaceNode(node, st.surface.slice(si, si + 1), bounds)
+      const removed = st.surface.splice(si, ei - si + 1, replacement)
       archiveRemoved(st, removed, ev.seq, bounds)
       for (const r of removed) {
         st.sums[r.cat] -= r.tokens
