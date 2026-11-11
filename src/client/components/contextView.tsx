@@ -47,6 +47,7 @@ import { aggregateByTurn, attachMarkers, boundaryIndex, jumpTargetOf, turnStepsO
 import { makeTrendOverview } from './trendOverview'
 import { stepStampOf } from './browserHelpers'
 import { assembleCached, cachedByData } from './derivedCache'
+import { replacementSeqForEvent } from '../compactionDiff'
 import { useLazyMount } from './useLazyMount'
 import { useConversationSurface } from './useConversationSurface'
 import { dnaDeltaMaximaOf, trendBandsOf } from '../dna'
@@ -218,6 +219,8 @@ export function makeContextView(
       })
     }
     const [nodeFocus, setNodeFocus] = useState<{ step: number | 'live'; key: string; cat: Category | 'system' | 'tools' } | null>(null)
+    const [eventDiff, setEventDiff] = useState<{ seq: number; nonce: number } | null>(null)
+    const clearEventDiff = useCallback(() => { setEventDiff(null) }, [])
     const clearNodeFocus = useCallback(() => { setNodeFocus(null) }, [])
 
     const loadImage = useMemo(
@@ -577,18 +580,29 @@ export function makeContextView(
       })
     }, [data])
     const canEventFocus = useCallback((ev: ContextEventRecord): boolean => (
-      ev.kind !== 'compaction' && ev.kind !== 'prune' ? true : boundaryIndex(requests, ev.seq) >= 0
-    ), [requests])
+      ev.kind !== 'compaction' && ev.kind !== 'prune'
+        ? true
+        : boundaryIndex(requests, ev.seq) >= 0
+          || (data !== null && replacementSeqForEvent(data, ev.seq) !== undefined)
+    ), [requests, data])
     const focusEvent = useCallback((ev: ContextEventRecord): void => {
       if (ev.kind === 'compaction' || ev.kind === 'prune') {
         const idx = boundaryIndex(requests, ev.seq)
+        const hasDiff = data !== null && replacementSeqForEvent(data, ev.seq) !== undefined
+        if (idx >= 0) {
+          const seq = requests[idx].seq
+          setOverview(false)
+          setGranularity('step')
+          setSelectedSeq(seq)
+          setFocusSeq(seq)
+        }
+        if (hasDiff) {
+          setEventDiff(current => ({ seq: ev.seq, nonce: (current?.nonce ?? 0) + 1 }))
+          revealCard(rootRef.current, '.lc-col-browser')
+          return
+        }
         /* v8 ignore next 1 */
         if (idx < 0) return
-        const seq = requests[idx].seq
-        setOverview(false)
-        setGranularity('step')
-        setSelectedSeq(seq)
-        setFocusSeq(seq)
         revealCard(rootRef.current, '[data-lc-trend]')
         return
       }
@@ -597,7 +611,7 @@ export function makeContextView(
       if (step === null) return
       setNodeFocus({ step, key: 'n' + String(ev.seq), cat: node?.cat ?? 'inject' })
       revealCard(rootRef.current, '.lc-col-browser')
-    }, [requests, nodeOfSeq])
+    }, [requests, nodeOfSeq, data])
 
     if (!data) {
       return (
@@ -824,6 +838,8 @@ export function makeContextView(
         onDetailRetry={source.retryDetail}
         catFocus={catFocus}
         onCatFocusHandled={clearCatFocus}
+        eventDiff={eventDiff}
+        onEventDiffHandled={clearEventDiff}
         dna={dna}
         onDnaChange={setDna}
         locale={activeLocale}
