@@ -436,6 +436,7 @@ export interface SessionCostUsage {
 
 export interface SurfaceNode {
   seq: number
+  seat?: number
   time?: number
   cat: Category
   tokens: number
@@ -613,7 +614,7 @@ export interface OverviewPageRow {
   updatedAt: number
   running: boolean
   archived: boolean
-  group?: string
+  group?: string | null
   tokens: number
   turns: number
   steps?: number
@@ -621,8 +622,7 @@ export interface OverviewPageRow {
   total: number
   contextWindow?: number
   maxOutputTokens?: number
-  model?: string
-  lastUser?: string
+  lastUser?: string | null
   costUsd: number | null
   createdDay?: string
 }

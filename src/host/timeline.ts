@@ -12,6 +12,7 @@ import { withCost, type CostSource } from './cost'
 
 const surfaceNodeSchema = z.object({
   seq: z.number().int().nonnegative(),
+  seat: z.number().int().nonnegative().optional(),
   time: z.number().optional(),
   cat: z.enum(['user', 'inject', 'skill', 'assistant', 'tool']),
   tokens: z.number().int().nonnegative(),
@@ -367,7 +368,7 @@ const timelineStateSchema = z.object({
   commandCallsOverflow: z.boolean().optional(),
 }) as unknown as z.ZodType<TimelineState>
 
-export const TIMELINE_STATE_VERSION = 42
+export const TIMELINE_STATE_VERSION = 43
 
 export function createContextTimelineDefinition(
   config: Config,
