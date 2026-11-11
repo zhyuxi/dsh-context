@@ -32,4 +32,22 @@ export function stepStampOf(requests: RequestRecord[]): (itemSeq: number) => { t
   }
 }
 
+
+export function findRowByKey(root: HTMLElement, key: string): HTMLElement | null {
+  for (const row of root.querySelectorAll<HTMLElement>('[data-lc-key]')) {
+    if (row.dataset.lcKey === key) return row
+  }
+  return null
+}
+
+export const safeIdPart = (key: string): string => key.replace(/[^a-zA-Z0-9_-]/g, '_')
+
+export function previousRequest(
+  requests: readonly RequestRecord[],
+  record: RequestRecord,
+): RequestRecord | null {
+  const index = requests.findIndex(item => item.seq === record.seq)
+  return index > 0 ? requests[index - 1] : null
+}
+
 export const DNA_MIN_BAND = 0.35

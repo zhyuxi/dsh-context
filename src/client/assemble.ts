@@ -52,7 +52,7 @@ export function assemble(data: ContextTimeline, headers: ContextHeaders | null, 
     }
     nodes = picked
   }
-  nodes.sort((a, b) => a.seq - b.seq)
+  nodes.sort((a, b) => (a.seat ?? a.seq) - (b.seat ?? b.seq) || a.seq - b.seq)
 
   let missingLive = 0
   if (data.droppedNodes > 0) {
