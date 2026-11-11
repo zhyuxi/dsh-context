@@ -113,3 +113,19 @@ describe('systemAt — the system prompt in force', () => {
     assert.equal(systemAt(timeline(), null, null), null)
   })
 })
+
+describe('assemble model-visible replacement order', () => {
+  test('sorts by inherited seat with seq as the tie breaker and falls back for legacy nodes', () => {
+    const data = timeline({
+      nodes: [
+        surfaceNodeAt(3, { seat: 8 }),
+        surfaceNodeAt(5, { seat: 2 }),
+        surfaceNodeAt(8, { seat: 2 }),
+        surfaceNodeAt(9),
+      ],
+      archive: [surfaceNodeAt(1, { gone: 10 }), surfaceNodeAt(2, { gone: 6 })],
+    })
+    assert.deepEqual(assemble(data, null, null).nodes.map(n => n.seq), [5, 8, 3, 9])
+    assert.deepEqual(assemble(data, null, 8).nodes.map(n => n.seq), [1, 5, 3])
+  })
+})

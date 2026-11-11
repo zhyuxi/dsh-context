@@ -9,6 +9,7 @@ const SRC = join(process.cwd(), 'src/client')
 const I18N_MODULE = /^i18n(?:[A-Z][a-z]+)?\.ts$/
 
 const DYNAMIC_PREFIXES = [
+  'browser.diff.',
   'browser.kind.', 'browser.search.', 'cat.', 'cmds.filter.', 'cmds.sort.', 'ev.mode.',
   'files.kind.', 'files.sort.', 'fleet.comms.detail.', 'fleet.comms.kind.', 'fleet.kind.',
   'fleet.pulse.mode.', 'fleet.settled.', 'fleet.settledShort.', 'fleet.task.', 'form.',
