@@ -614,7 +614,7 @@ export interface OverviewPageRow {
   updatedAt: number
   running: boolean
   archived: boolean
-  group?: string | null
+  group?: string
   tokens: number
   turns: number
   steps?: number
@@ -622,7 +622,8 @@ export interface OverviewPageRow {
   total: number
   contextWindow?: number
   maxOutputTokens?: number
-  lastUser?: string | null
+  model?: string
+  lastUser?: string
   costUsd: number | null
   createdDay?: string
 }
