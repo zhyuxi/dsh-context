@@ -75,3 +75,14 @@
 .lc-br-hits { flex: none; color: var(--dsw-alias-label-secondary); font-size: 11px; }
 .lc-br-content { padding: 2px 6px 8px 26px; display: flex; flex-direction: column; gap: 6px; }
 .lc-br-dim { color: var(--dsw-alias-label-secondary); }
+
+.lc-br-diff-head .lc-card-title { flex-wrap: wrap; }
+.lc-br-diff-close { margin-left: auto; }
+.lc-br-diff-list .lc-br-elem-row { flex-wrap: wrap; }
+.lc-br-diff-list .lc-br-tags { flex-wrap: wrap; }
+.lc-br-diff-list .lc-br-preview { min-width: 120px; }
+.lc-br-diff-same { color: var(--dsw-alias-label-secondary); }
+.lc-br-diff-removed { color: var(--dsw-alias-state-error-primary); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent); }
+.lc-br-diff-added { color: var(--dsw-alias-state-success-primary); background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent); }
+.lc-br-diff-changed, .lc-br-diff-moved { color: var(--dsw-alias-state-warn-primary); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 12%, transparent); }
+.lc-br-diff-position { direction: ltr; unicode-bidi: isolate; }

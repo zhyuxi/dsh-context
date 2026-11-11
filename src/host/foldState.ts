@@ -10,12 +10,27 @@ function finiteOf(value: unknown): value is number {
 
 export function slimSurfaceNode(node: SurfaceNode): SurfaceNode {
   const slim: SurfaceNode = { seq: node.seq, cat: node.cat, tokens: node.tokens }
+  if (node.seat !== undefined) slim.seat = node.seat
   if (node.reasoning !== undefined) slim.reasoning = node.reasoning
   if (node.answerTokens !== undefined) slim.answerTokens = node.answerTokens
   if (node.callTokens !== undefined) slim.callTokens = node.callTokens
   if (node.imgs !== undefined) slim.imgs = node.imgs
   if (node.tool !== undefined) slim.tool = node.tool
   return slim
+}
+
+export function surfaceNodeOf(node: SurfaceNode, bounds: FoldBounds): SurfaceNode {
+  return bounds.headOnly === true ? slimSurfaceNode(node) : node
+}
+
+export function replacementSurfaceNode(
+  node: SurfaceNode,
+  removed: readonly SurfaceNode[],
+  bounds: FoldBounds,
+): SurfaceNode {
+  const first = removed[0]
+  if (first !== undefined) node.seat = first.seat ?? first.seq
+  return surfaceNodeOf(node, bounds)
 }
 
 function slimSurfaceVal(node: unknown): SurfaceNode | undefined {
@@ -27,6 +42,7 @@ function slimSurfaceVal(node: unknown): SurfaceNode | undefined {
     seq: n.seq,
     cat: n.cat as Category,
     tokens: n.tokens,
+    ...(finiteOf(n.seat) ? { seat: n.seat } : {}),
     ...(finiteOf(n.reasoning) ? { reasoning: n.reasoning } : {}),
     ...(finiteOf(n.answerTokens) ? { answerTokens: n.answerTokens } : {}),
     ...(finiteOf(n.callTokens) ? { callTokens: n.callTokens } : {}),
