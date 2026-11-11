@@ -23,23 +23,17 @@ import type { StackedBarProps } from './stackedBar'
 import type { AttachmentOpener, ImageLoader } from '../services'
 import { TextSection, schemaTextOf, RowToolbar, ToolSchema } from './browserToolCard'
 import { revealRowInCard } from '../revealScroll'
-import { NodeContent, byCatOf, msgKindsOf } from './browserNodes'
+import { byCatOf, msgKindsOf } from './browserNodes'
 import type { RowKind } from './browserNodes'
-import { DNA_MIN_BAND, countOf, lastOfTurn, stepStampOf } from './browserHelpers'
+import { DNA_MIN_BAND, countOf, findRowByKey, lastOfTurn, previousRequest, safeIdPart, stepStampOf } from './browserHelpers'
 import type { CatFocus } from './browserHelpers'
 export type { CatFocus } from './browserHelpers'
 export { stepStampOf } from './browserHelpers'
 import { MapIcon, makeBrowserTreemap } from './browserTreemap'
 import type { MapBlock } from '../treemap'
-
-function findRowByKey(root: HTMLElement, key: string): HTMLElement | null {
-  for (const row of root.querySelectorAll<HTMLElement>('[data-lc-key]')) {
-    if (row.dataset.lcKey === key) return row
-  }
-  return null
-}
-
-const safeIdPart = (key: string): string => key.replace(/[^a-zA-Z0-9_-]/g, '_')
+import { buildContextEventDiff } from '../compactionDiff'
+import { browserRowTagNode, makeBrowserMessageRow } from './browserMessageRow'
+import { makeBrowserEventDiff } from './browserEventDiff'
 
 const STEP_PICK_MAX = 500
 const nodeEstimateSize = (): number => 30
@@ -59,6 +53,8 @@ export interface ContextBrowserProps {
   onNodeFocusHandled?: () => void
   catFocus?: CatFocus | null
   onCatFocusHandled?: () => void
+  eventDiff?: { seq: number; nonce: number } | null
+  onEventDiffHandled?: () => void
   hoverKey?: string | null
   onHoverKey?: (key: string | null) => void
   onOpenCat?: (cat: string | null) => void
@@ -78,6 +74,7 @@ export function makeContextBrowser(
   const { t, fmt, fmtTime, catLabel } = kit
   const DetailNote = makeDetailNote(kit)
   const BrowserTreemap = makeBrowserTreemap(kit)
+  const BrowserEventDiff = makeBrowserEventDiff(kit)
   const nodeText = makeNodeText(kit)
   const rich = makeRichText(kit)
   const AttachmentSection = makeAttachmentSection(kit)
@@ -105,6 +102,7 @@ export function makeContextBrowser(
     const [dnaKey, setDnaKey] = useState<string | null>(null)
     const [rowDnaKey, setRowDnaKey] = useState<string | null>(null)
     const [mapOn, setMapOn] = useState(false)
+    const [diffEvent, setDiffEvent] = useState<number | null>(null)
     const [deltaBase, setDeltaBase] = useState<DefaultDeltaBase>(() => settings.defaultDeltaBase())
     const onOpenCat = props.onOpenCat
     const setCat = (c: string | null): void => {
@@ -150,6 +148,7 @@ export function makeContextBrowser(
     const nodeFocus = props.nodeFocus
     useEffect(() => {
       if (nodeFocus === null || nodeFocus === undefined) return
+      setDiffEvent(null)
       setSel(nodeFocus.step)
       setCat(nodeFocus.cat)
       setOpenElem(nodeFocus.key)
@@ -158,10 +157,26 @@ export function makeContextBrowser(
       setFocusRowKey(nodeFocus.key)
       if (props.onNodeFocusHandled !== undefined) props.onNodeFocusHandled()
     }, [nodeFocus, props.onNodeFocusHandled, onOpenCat])
+    const eventDiff = props.eventDiff
+    useEffect(() => {
+      if (eventDiff === null || eventDiff === undefined) return
+      const exists = data.events.some(event => event.seq === eventDiff.seq)
+      if (dna) setDna(false)
+      setMapOn(false)
+      setCat(null)
+      setOpenElem(null)
+      setRowQuery('')
+      setRowKind(null)
+      setFocusRowKey(null)
+      setDiffEvent(exists ? eventDiff.seq : null)
+      if (props.onEventDiffHandled !== undefined) props.onEventDiffHandled()
+    }, [eventDiff, data.events, props.onEventDiffHandled, onOpenCat, dna])
+
     const catFocus = props.catFocus
     useEffect(() => {
       if (catFocus === null || catFocus === undefined) return
       if (dna) setDna(false)
+      setDiffEvent(null)
       setSel(catFocus.step ?? 'live')
       setCat(catFocus.cat)
       setOpenElem(null)
@@ -279,15 +294,11 @@ export function makeContextBrowser(
       setOpenElem(null)
     }
 
-    const prevRecordOf = (r: RequestRecord): RequestRecord | null => {
-      const i = requests.findIndex(x => x.seq === r.seq)
-      return i > 0 ? requests[i - 1] : null
-    }
     const lastReq = requests.length > 0 ? requests[requests.length - 1] : null
     const turnBaseOf = (r: RequestRecord): RequestRecord | null => lastOfTurn(requests, (r.turn ?? 0) - 1)
     const refReq = req === null
       ? deltaBase === 'step' ? lastReq : lastReq === null ? null : turnBaseOf(lastReq)
-      : deltaBase === 'turn' ? turnBaseOf(req) : prevRecordOf(req)
+      : deltaBase === 'turn' ? turnBaseOf(req) : previousRequest(requests, req)
     const zeroBase = refReq === null && lastReq !== null
     const prevView = useMemo(
       () => (refReq !== null ? assembleCached(data, headers, refReq.seq) : null),
@@ -540,49 +551,13 @@ export function makeContextBrowser(
       return { ...pendingStamp, pending: true }
     }
 
-    const rowTagNode = (tag: string | null, names: readonly string[] | null): ReactNode => {
-      if (tag === null) return null
-      if (names === null) return <span className="lc-br-tag">{tag}</span>
-      const counts = new Map<string, number>()
-      for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1)
-      return [...counts.entries()].map(([name, count]) => (
-        <span key={name} className="lc-br-tag">{count > 1 ? name + ' ×' + String(count) : name}</span>
-      ))
-    }
-
-    const messageRow = (
-      r: NodeRow,
-      tag: ReactNode,
-      onHover?: (over: boolean) => void,
-      opts?: { tabIndex?: number; rowRef?: (el: HTMLElement | null) => void },
-    ): ReactElement =>
-      elemRow(`n${r.n.seq}`, tag, r.preview, r.n.tokens, r.n.time,
-        <NodeContent
-          node={r.n}
-          conv={r.conv}
-          rich={rich}
-          att={{ Section: AttachmentSection, load: props.loadImage, open: props.openAttachment }}
-          labels={{
-            thinking: t('block.thinking'),
-            answer: t('block.answer'),
-            content: t('block.content'),
-            result: t('block.result'),
-            summary: t('block.summary'),
-            other: t('attach.other'),
-            lines: lineLabel,
-            callState: (err: boolean, exit: number | null) => (
-              <span className={'lc-ts-call-state ' + (err ? 'lc-ts-call-err' : 'lc-ts-call-ok')}>
-                <i />
-                {err
-                  ? t('call.fail') + (exit !== null ? ' · ' + t('call.exit', { n: exit }) : '')
-                  : t('call.ok')}
-              </span>
-            ),
-          }}
-          hint={r.conv === undefined ? missNote : t('browser.noContent')}
-        />,
-        r.rowErr, null, stampFor(r.n.seq),
-        { onHover, tabIndex: opts?.tabIndex, rowRef: opts?.rowRef })
+    const messageRow = makeBrowserMessageRow(kit, rich, AttachmentSection, lineLabel, {
+      elemRow,
+      loadImage: props.loadImage,
+      openAttachment: props.openAttachment,
+      missNote,
+      stampFor,
+    })
 
     const systemPreviewOf = (sys: SystemPromptNode): string =>
       headerContent.get(sys.seq)?.system?.replace(/\s+/g, ' ').trim().slice(0, 80) ?? ''
@@ -739,7 +714,7 @@ export function makeContextBrowser(
           {rowctl}
           {rowsBlock(keys, catScope.onKeyDown, setCatRowsEl, catScope, (key, index) => {
             const row = shown[index]
-            return messageRow(row, rowTagNode(row.tag, row.tagNames), undefined, {
+            return messageRow(row, browserRowTagNode(row.tag, row.tagNames), undefined, {
               tabIndex: catScope.tabIndexFor(key),
               rowRef: catScope.measure(key),
             })
@@ -805,6 +780,24 @@ export function makeContextBrowser(
         onChange={setRowQuery}
       />
     )
+
+    const diffModel = useMemo(
+      () => diffEvent === null ? undefined : buildContextEventDiff(data, diffEvent),
+      [data, diffEvent],
+    )
+    if (diffEvent !== null) {
+      return (
+        <BrowserEventDiff
+          diff={diffModel}
+          convNodes={convNodes}
+          fetchContent={fetchContent}
+          loadImage={props.loadImage}
+          openAttachment={props.openAttachment}
+          session={sessionScope}
+          onClose={() => { setDiffEvent(null) }}
+        />
+      )
+    }
 
     return (
       <div className="lc-card lc-br" ref={rootRef}>
@@ -923,7 +916,7 @@ export function makeContextBrowser(
                     <>
                       {catChip(r.n.cat)}
                       <span className="lc-br-pos">#{fmt(pos)}</span>
-                      {rowTagNode(r.tag, r.tagNames)}
+                      {browserRowTagNode(r.tag, r.tagNames)}
                     </>
                   ), (over) => { setRowDnaKey(over ? 'n' + String(r.n.seq) : null) }, {
                     tabIndex: flatScope.tabIndexFor(key),
